@@ -1,9 +1,5 @@
-"""
-Dataset downloader — COCO 2017 Validation Set
-5.000 immagini royalty-free, ~1 GB, nessuna API key richiesta.
-"""
-
 import json
+import shutil  # Aggiunto per pulizia cartelle
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -20,13 +16,11 @@ ANNOT_FILE = Path("data/annotations/captions_val2017.json")
 def _download(url: str, dest: Path, label: str):
     """Download con progress bar testuale."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-
     if dest.exists():
         print(f"   Già presente: {dest.name}")
         return
 
     print(f"   Download {label}...")
-    print(f"   URL: {url}")
 
     def _progress(block_num, block_size, total_size):
         downloaded = block_num * block_size
@@ -37,7 +31,7 @@ def _download(url: str, dest: Path, label: str):
             print(f"\r   [{bar}] {pct:5.1f}%  {mb:.0f} MB", end="", flush=True)
 
     urllib.request.urlretrieve(url, dest, reporthook=_progress)
-    print()  # newline dopo la progress bar
+    print()
 
 
 def _extract(zip_path: Path, dest_dir: Path, label: str):
@@ -48,8 +42,15 @@ def _extract(zip_path: Path, dest_dir: Path, label: str):
 
 
 def _copy_to_image_dir(source_dir: Path, max_images: int = 5000):
-    """Copia le immagini COCO nella cartella IMAGE_DIR del progetto."""
-    IMAGE_DIR.mkdir(exist_ok=True)
+    """Copia le immagini COCO. Svuota la cartella se il numero richiesto è cambiato."""
+    if IMAGE_DIR.exists():
+        # Controlliamo quante immagini ci sono già
+        existing_files = list(IMAGE_DIR.glob("*.jpg"))
+        if len(existing_files) != max_images:
+            print(f"   Reset cartella '{IMAGE_DIR}' (da {len(existing_files)} a {max_images} immagini)...")
+            shutil.rmtree(IMAGE_DIR)
+
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     images = sorted(source_dir.glob("*.jpg"))[:max_images]
 
     print(f"   Copia {len(images)} immagini in '{IMAGE_DIR}'...")
@@ -57,26 +58,26 @@ def _copy_to_image_dir(source_dir: Path, max_images: int = 5000):
         dest = IMAGE_DIR / img.name
         if not dest.exists():
             dest.write_bytes(img.read_bytes())
-
-    print(f"   Fatto: {len(images)} immagini disponibili in '{IMAGE_DIR}/'")
     return len(images)
 
 
 def _save_captions(max_images: int = 5000):
-    """
-    Salva un file captions.json con le didascalie COCO —
-    utile per valutare la qualità della ricerca semantica.
-    """
+    """Salva captions.json sincronizzato esattamente con le immagini copiate."""
     if not ANNOT_FILE.exists():
+        print("   ⚠️ File annotazioni non trovato!")
         return
 
     with open(ANNOT_FILE, encoding="utf-8") as f:
         data = json.load(f)
 
-    # mappa image_id → filename
-    id_to_file = {img["id"]: img["file_name"] for img in data["images"][:max_images]}
+    # Importante: usiamo lo stesso ordinamento di _copy_to_image_dir
+    # COCO filenames sono come '000000000139.jpg'
+    all_img_files = sorted([img["file_name"] for img in data["images"]])
+    target_files = set(all_img_files[:max_images])
 
-    # raggruppa didascalie per immagine
+    # Mappa inversa per velocizzare il recupero
+    id_to_file = {img["id"]: img["file_name"] for img in data["images"] if img["file_name"] in target_files}
+
     captions: dict[str, list[str]] = {}
     for ann in data["annotations"]:
         fname = id_to_file.get(ann["image_id"])
@@ -86,101 +87,33 @@ def _save_captions(max_images: int = 5000):
     out = Path("data/captions.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump(captions, f, ensure_ascii=False, indent=2)
-
     print(f"   Didascalie salvate: {out} ({len(captions)} immagini)")
 
 
+# --- Funzioni Pubbliche ---
 def download_coco_resources():
-    """
-    Gestisce solo il download e l'estrazione dei file raw.
-    Da eseguire una sola volta.
-    """
-    print("\n" + "═" * 55)
-    print("  DOWNLOAD COCO 2017 RESOURCES")
-    print("═" * 55)
-
-    # 1. Immagini
-    _download(COCO_IMAGES_URL, COCO_ZIP, "immagini COCO val2017 (~1 GB)")
-    coco_img_dir = Path("data/val2017")
-    if not coco_img_dir.exists():
+    """Scarica ed estrae i file se non presenti."""
+    print("\n" + "═" * 55 + "\n  STEP 1: DOWNLOAD RISORSE\n" + "═" * 55)
+    _download(COCO_IMAGES_URL, COCO_ZIP, "immagini COCO (~1 GB)")
+    if not Path("data/val2017").exists():
         _extract(COCO_ZIP, Path("data"), "immagini")
 
-    # 2. Annotation
-    _download(COCO_ANNOT_URL, ANNOT_ZIP, "annotazioni COCO (~241 MB)")
-    annot_dir = Path("data/annotations")
-    if not annot_dir.exists():
+    _download(COCO_ANNOT_URL, ANNOT_ZIP, "annotazioni (~241 MB)")
+    if not Path("data/annotations").exists():
         _extract(ANNOT_ZIP, Path("data"), "annotazioni")
-
-    print("\n✓ Risorse scaricate ed estratte in data/")
 
 
 def prepare_coco_dataset(max_images: int = 5000):
-    """
-    Gestisce il campionamento, la copia e la generazione dei metadati.
-    Può essere rieseguita per cambiare il numero di immagini.
-    """
-    print("\n" + "═" * 55)
-    print("  PREPARAZIONE DATASET")
-    print(f"  Target: {max_images} immagini → '{IMAGE_DIR}/'")
-    print("═" * 55)
-
+    """Prepara il sotto-insieme di immagini e metadati."""
+    print("\n" + "═" * 55 + f"\n  STEP 2: PREPARAZIONE SAMPLE ({max_images})\n" + "═" * 55)
     coco_img_dir = Path("data/val2017")
 
     if not coco_img_dir.exists():
-        print("❌ Errore: Cartella immagini non trovata. Esegui prima il download.")
+        print("❌ Errore: Dati raw non trovati. Esegui download_coco_resources().")
         return
 
-    # ── 1. Copia in images/ ───────────────────────────
-    # Nota: _copy_to_image_dir dovrebbe gestire la pulizia
-    # o l'aggiunta se vuoi cambiare il sample
     n = _copy_to_image_dir(coco_img_dir, max_images)
-
-    # ── 2. Salva didascalie ───────────────────────────
     _save_captions(max_images)
 
-    print("\n" + "═" * 55)
-    print(f"  ✓ {n} immagini pronte in '{IMAGE_DIR}/'")
-    print(f"  ✓ Didascalie sincronizzate per {n} immagini")
-    print("\n  Prossimo passo (re-indicizzazione):")
-    print("    python main.py --index")
-    print("═" * 55 + "\n")
-
-
-# def download_coco_val(max_images: int = 5000):
-#     """
-#     Pipeline completa:
-#     1. Scarica COCO val2017 (~1 GB)
-#     2. Estrae le immagini
-#     3. Scarica le annotation con le didascalie
-#     4. Copia tutto nella cartella images/ del progetto
-#     """
-#     print("\n" + "═" * 55)
-#     print("  COCO 2017 Validation Set — downloader")
-#     print(f"  Target: {max_images} immagini → '{IMAGE_DIR}/'")
-#     print("═" * 55)
-
-#     # ── 1. Immagini ──────────────────────────────────
-#     _download(COCO_IMAGES_URL, COCO_ZIP, "immagini COCO val2017 (~1 GB)")
-#     coco_img_dir = Path("data/val2017")
-#     if not coco_img_dir.exists():
-#         _extract(COCO_ZIP, Path("data"), "immagini")
-
-#     # ── 2. Annotation (didascalie) ────────────────────
-#     _download(COCO_ANNOT_URL, ANNOT_ZIP, "annotazioni COCO (~241 MB)")
-#     annot_dir = Path("data/annotations")
-#     if not annot_dir.exists():
-#         _extract(ANNOT_ZIP, Path("data"), "annotazioni")
-
-#     # ── 3. Copia in images/ ───────────────────────────
-#     n = _copy_to_image_dir(coco_img_dir, max_images)
-
-#     # ── 4. Salva didascalie ───────────────────────────
-#     _save_captions(max_images)
-
-#     print("\n" + "═" * 55)
-#     print(f"  ✓ {n} immagini pronte in '{IMAGE_DIR}/'")
-#     print("  ✓ Didascalie in 'data/captions.json' (utile per eval)")
-#     print("\n  Prossimo passo:")
-#     print("    python main.py --index")
-#     print('    python main.py --query "a dog running on the beach"')
-#     print("═" * 55 + "\n")
+    print(f"\n✓ Dataset pronto con {n} immagini.")
+    print("Esegui ora: python main.py --index")
