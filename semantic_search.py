@@ -12,6 +12,10 @@ Utilizzo rapido:
     python semantic_search.py --query "operai al lavoro in trincea" --top-k 5
 """
 
+import os
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import argparse
 import json
 import time
