@@ -5,6 +5,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import argparse
 
 from semantic_search.config import DEFAULT_MODEL, TOP_K_DEFAULT
+from semantic_search.dataset import download_coco_val
 from semantic_search.demo import download_demo_images
 from semantic_search.encoder import encode_text
 from semantic_search.evaluation import run_evaluation
@@ -26,6 +27,8 @@ def main():
     parser.add_argument(
         "--model", type=str, default=DEFAULT_MODEL, help=f"Modello HuggingFace (default: {DEFAULT_MODEL})"
     )
+    parser.add_argument("--coco", action="store_true", help="Scarica COCO val2017 (5.000 immagini)")
+    parser.add_argument("--max-images", type=int, default=5000, help="Quante immagini COCO usare (default: 5000)")
     args = parser.parse_args()
 
     if args.demo:
@@ -54,6 +57,12 @@ def main():
             print(f"[3/3] Ricerca top-{args.top_k}...")
             results = search(index, metadata, query_vec, top_k=args.top_k)
             print_results(results, args.query)
+        return
+
+    if args.coco:
+        download_coco_val(max_images=args.max_images)
+        model, processor = load_model(args.model)
+        run_indexing(model, processor)
         return
 
     parser.print_help()
