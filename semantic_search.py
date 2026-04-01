@@ -12,15 +12,14 @@ Utilizzo rapido:
     python semantic_search.py --query "operai al lavoro in trincea" --top-k 5
 """
 
-import os
+import argparse
 import json
 import time
-import argparse
 import warnings
 from pathlib import Path
 
-import torch
 import numpy as np
+import torch
 from PIL import Image
 from tqdm import tqdm
 
@@ -29,13 +28,13 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # ─────────────────────────────────────────────
 # Configurazione
 # ─────────────────────────────────────────────
-DEFAULT_MODEL   = "openai/clip-vit-base-patch32"   # ~150 MB, ottimo su CPU
-IMAGE_DIR       = Path("images")                    # cartella immagini da indicizzare
-INDEX_PATH      = Path("faiss_index.bin")           # indice FAISS salvato
-META_PATH       = Path("metadata.json")             # metadati immagini
-EMBED_DIM       = 512                               # dimensione embedding CLIP ViT-B/32
-TOP_K_DEFAULT   = 3                                 # risultati di default
-SUPPORTED_EXTS  = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+DEFAULT_MODEL = "openai/clip-vit-base-patch32"  # ~150 MB, ottimo su CPU
+IMAGE_DIR = Path("images")  # cartella immagini da indicizzare
+INDEX_PATH = Path("faiss_index.bin")  # indice FAISS salvato
+META_PATH = Path("metadata.json")  # metadati immagini
+EMBED_DIM = 512  # dimensione embedding CLIP ViT-B/32
+TOP_K_DEFAULT = 3  # risultati di default
+SUPPORTED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 
 # ─────────────────────────────────────────────
@@ -43,7 +42,7 @@ SUPPORTED_EXTS  = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 # ─────────────────────────────────────────────
 def load_model(model_name: str = DEFAULT_MODEL):
     """Carica CLIP (vision + text encoder) su CPU."""
-    from transformers import CLIPProcessor, CLIPModel
+    from transformers import CLIPModel, CLIPProcessor
 
     print(f"[1/3] Caricamento modello: {model_name}")
     t0 = time.time()
@@ -77,7 +76,7 @@ def encode_images(model, processor, image_paths: list[Path]) -> np.ndarray:
                 feat = outputs.pooler_output
                 # proiezione nello spazio condiviso testo-immagine
                 feat = model.visual_projection(feat)
-                feat = feat / feat.norm(dim=-1, keepdim=True)   # normalizzazione L2
+                feat = feat / feat.norm(dim=-1, keepdim=True)  # normalizzazione L2
 
             embeddings.append(feat.squeeze().numpy().astype(np.float32))
 
@@ -98,8 +97,10 @@ def encode_text(model, processor, query: str) -> np.ndarray:
     inputs = processor(text=[query], return_tensors="pt", padding=True, truncation=True)
 
     with torch.no_grad():
-        feat = model.get_text_features(**inputs)
-        feat = feat / feat.norm(dim=-1, keepdim=True)
+        outputs = model.text_model(**inputs)
+        feat = outputs.pooler_output  # tensore (1, hidden_dim)
+        feat = model.text_projection(feat)  # proiezione nello spazio condiviso
+        feat = feat / feat.norm(dim=-1, keepdim=True)  # normalizzazione L2
 
     return feat.squeeze().numpy().astype(np.float32)
 
@@ -135,12 +136,11 @@ def load_index():
     import faiss
 
     if not INDEX_PATH.exists() or not META_PATH.exists():
-        raise FileNotFoundError(
-            "Indice non trovato. Esegui prima: python semantic_search.py --demo"
-        )
+        msg = "Indice non trovato. Esegui prima: python semantic_search.py --demo"
+        raise FileNotFoundError(msg)
 
     index = faiss.read_index(str(INDEX_PATH))
-    with open(META_PATH, "r", encoding="utf-8") as f:
+    with open(META_PATH, encoding="utf-8") as f:
         metadata = json.load(f)
 
     print(f"   Indice caricato: {index.ntotal} immagini indicizzate")
@@ -158,8 +158,8 @@ def search(index, metadata: list[dict], query_vec: np.ndarray, top_k: int = TOP_
     scores, indices = index.search(query_vec.reshape(1, -1), top_k)
 
     results = []
-    for score, idx in zip(scores[0], indices[0]):
-        if idx < 0:   # FAISS restituisce -1 se non ci sono abbastanza risultati
+    for score, idx in zip(scores[0], indices[0], strict=False):
+        if idx < 0:  # FAISS restituisce -1 se non ci sono abbastanza risultati
             continue
         entry = metadata[idx].copy()
         entry["score"] = float(score)
@@ -173,13 +173,11 @@ def search(index, metadata: list[dict], query_vec: np.ndarray, top_k: int = TOP_
 # ─────────────────────────────────────────────
 def run_indexing(model, processor, image_dir: Path = IMAGE_DIR):
     """Scansiona la cartella immagini, genera embedding e salva l'indice."""
-    image_paths = [
-        p for p in sorted(image_dir.rglob("*"))
-        if p.suffix.lower() in SUPPORTED_EXTS
-    ]
+    image_paths = [p for p in sorted(image_dir.rglob("*")) if p.suffix.lower() in SUPPORTED_EXTS]
 
     if not image_paths:
-        raise ValueError(f"Nessuna immagine trovata in '{image_dir}'. Hai eseguito --demo?")
+        msg = f"Nessuna immagine trovata in '{image_dir}'. Hai eseguito --demo?"
+        raise ValueError(msg)
 
     print(f"[2/3] Trovate {len(image_paths)} immagini in '{image_dir}'")
 
@@ -191,7 +189,7 @@ def run_indexing(model, processor, image_dir: Path = IMAGE_DIR):
             "filename": p.name,
             "stem": p.stem,
         }
-        for p in image_paths[:len(embeddings)]  # allineato a embed riusciti
+        for p in image_paths[: len(embeddings)]  # allineato a embed riusciti
     ]
 
     print("[3/3] Costruzione indice FAISS...")
@@ -205,14 +203,14 @@ def run_indexing(model, processor, image_dir: Path = IMAGE_DIR):
 # ─────────────────────────────────────────────
 DEMO_IMAGES = {
     # Immagini open-source da Unsplash (royalty-free)
-    "construction_trench.jpg":  "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=80",
-    "gas_pipeline_yellow.jpg":  "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=640&q=80",
-    "workers_excavation.jpg":   "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=640&q=80",
-    "road_repair.jpg":          "https://images.unsplash.com/photo-1621935010538-6bce8c00c74a?w=640&q=80",
-    "pipe_installation.jpg":    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=80",
-    "aerial_construction.jpg":  "https://images.unsplash.com/photo-1531834685032-c34bf0d84c77?w=640&q=80",
-    "safety_helmets.jpg":       "https://images.unsplash.com/photo-1542223616-9de9adb5e3e8?w=640&q=80",
-    "urban_excavation.jpg":     "https://images.unsplash.com/photo-1590496793929-36417d3117de?w=640&q=80",
+    "construction_trench.jpg": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=80",
+    "gas_pipeline_yellow.jpg": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=640&q=80",
+    "workers_excavation.jpg": "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=640&q=80",
+    "road_repair.jpg": "https://images.unsplash.com/photo-1621935010538-6bce8c00c74a?w=640&q=80",
+    "pipe_installation.jpg": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=80",
+    "aerial_construction.jpg": "https://images.unsplash.com/photo-1531834685032-c34bf0d84c77?w=640&q=80",
+    "safety_helmets.jpg": "https://images.unsplash.com/photo-1542223616-9de9adb5e3e8?w=640&q=80",
+    "urban_excavation.jpg": "https://images.unsplash.com/photo-1590496793929-36417d3117de?w=640&q=80",
 }
 
 
@@ -243,7 +241,7 @@ def download_demo_images():
 def print_results(results: list[dict], query: str):
     """Stampa i risultati in modo leggibile."""
     print(f"\n{'─' * 55}")
-    print(f"  Query: \"{query}\"")
+    print(f'  Query: "{query}"')
     print(f"{'─' * 55}")
 
     if not results:
@@ -288,8 +286,8 @@ def run_evaluation(model, processor, index, metadata):
         results = search(index, metadata, query_vec, top_k=2)
         elapsed = time.time() - t0
 
-        print(f"\n  Query: \"{query}\"")
-        print(f"  Latenza: {elapsed*1000:.0f}ms")
+        print(f'\n  Query: "{query}"')
+        print(f"  Latenza: {elapsed * 1000:.0f}ms")
         for i, r in enumerate(results, 1):
             print(f"    #{i} [{r['score']:.3f}] {r['filename']}")
 
@@ -303,32 +301,18 @@ def run_evaluation(model, processor, index, metadata):
 # Entry point
 # ─────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(
-        description="Semantic Visual Asset Retrieval — CLIP + FAISS"
+    parser = argparse.ArgumentParser(description="Semantic Visual Asset Retrieval — CLIP + FAISS")
+    parser.add_argument("--demo", action="store_true", help="Scarica immagini demo e costruisce l'indice")
+    parser.add_argument("--index", action="store_true", help="Ri-indicizza le immagini nella cartella 'images/'")
+    parser.add_argument(
+        "--query", type=str, default=None, help='Query testuale per la ricerca (es: "scavo con tubi gialli")'
     )
     parser.add_argument(
-        "--demo", action="store_true",
-        help="Scarica immagini demo e costruisce l'indice"
+        "--top-k", type=int, default=TOP_K_DEFAULT, help=f"Numero di risultati (default: {TOP_K_DEFAULT})"
     )
+    parser.add_argument("--eval", action="store_true", help="Esegui la batteria di valutazione dell'encoder")
     parser.add_argument(
-        "--index", action="store_true",
-        help="Ri-indicizza le immagini nella cartella 'images/'"
-    )
-    parser.add_argument(
-        "--query", type=str, default=None,
-        help="Query testuale per la ricerca (es: \"scavo con tubi gialli\")"
-    )
-    parser.add_argument(
-        "--top-k", type=int, default=TOP_K_DEFAULT,
-        help=f"Numero di risultati (default: {TOP_K_DEFAULT})"
-    )
-    parser.add_argument(
-        "--eval", action="store_true",
-        help="Esegui la batteria di valutazione dell'encoder"
-    )
-    parser.add_argument(
-        "--model", type=str, default=DEFAULT_MODEL,
-        help=f"Nome modello HuggingFace (default: {DEFAULT_MODEL})"
+        "--model", type=str, default=DEFAULT_MODEL, help=f"Nome modello HuggingFace (default: {DEFAULT_MODEL})"
     )
     args = parser.parse_args()
 
@@ -356,7 +340,7 @@ def main():
             run_evaluation(model, processor, index, metadata)
 
         if args.query:
-            print(f"[2/3] Encoding query...")
+            print("[2/3] Encoding query...")
             query_vec = encode_text(model, processor, args.query)
             print(f"[3/3] Ricerca top-{args.top_k}...")
             results = search(index, metadata, query_vec, top_k=args.top_k)
