@@ -1,9 +1,16 @@
 import json
 from pathlib import Path
 
+import faiss
 import numpy as np
 
-from semantic_search.config import EMBED_DIM, IMAGE_DIR, INDEX_PATH, META_PATH, SUPPORTED_EXTS
+from semantic_search.config import (
+    DEFAULT_MODEL,
+    EMBED_DIM,
+    IMAGE_DIR,
+    SUPPORTED_EXTS,
+    get_index_paths,
+)
 from semantic_search.encoder import encode_images
 
 
@@ -15,31 +22,28 @@ def build_index(embeddings: np.ndarray):
     return index
 
 
-def save_index(index, metadata: list[dict]):
-    import faiss
-
-    faiss.write_index(index, str(INDEX_PATH))
-    with open(META_PATH, "w", encoding="utf-8") as f:
+def save_index(index, metadata: list[dict], index_path: Path, meta_path: Path):
+    faiss.write_index(index, str(index_path))
+    with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)
-    print(f"   Indice salvato: {INDEX_PATH} ({index.ntotal} vettori)")
 
 
-def load_index():
-    import faiss
-
-    if not INDEX_PATH.exists() or not META_PATH.exists():
-        msg = "Indice non trovato. Esegui prima: python main.py --demo"
+def load_index(index_path: Path, meta_path: Path):
+    if not index_path.exists() or not meta_path.exists():
+        msg = f"Indice non trovato in {index_path.parent}. Esegui prima --index."
         raise FileNotFoundError(msg)
-
-    index = faiss.read_index(str(INDEX_PATH))
-    with open(META_PATH, encoding="utf-8") as f:
+    index = faiss.read_index(str(index_path))
+    with open(meta_path, encoding="utf-8") as f:
         metadata = json.load(f)
-
-    print(f"   Indice caricato: {index.ntotal} immagini indicizzate")
+    print(f"   Indice caricato: {index.ntotal} immagini ({index_path.parent.name})")
     return index, metadata
 
 
-def run_indexing(model, processor, image_dir: Path = IMAGE_DIR):
+def run_indexing(
+    model, processor, image_dir: Path = IMAGE_DIR, index_path: Path | None = None, meta_path: Path | None = None
+):
+    if index_path is None or meta_path is None:
+        index_path, meta_path = get_index_paths(DEFAULT_MODEL)
     image_paths = [p for p in sorted(image_dir.rglob("*")) if p.suffix.lower() in SUPPORTED_EXTS]
 
     if not image_paths:

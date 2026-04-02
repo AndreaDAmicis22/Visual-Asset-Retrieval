@@ -4,13 +4,14 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from PIL import Image
 
+from semantic_search.config import DEFAULT_MODEL, get_index_paths
 from semantic_search.encoder import encode_text
 from semantic_search.index import load_index
 from semantic_search.model import load_model
 from semantic_search.search import search
 
 
-def visual_search(query: str, top_k: int = 6, cols: int = 3):
+def visual_search(query: str, top_k: int = 6, cols: int = 3, model_name: str = DEFAULT_MODEL):
     """
     Esegue la ricerca semantica e mostra i risultati come griglia di immagini.
 
@@ -19,10 +20,12 @@ def visual_search(query: str, top_k: int = 6, cols: int = 3):
     query  : testo della ricerca (italiano o inglese)
     top_k  : numero di risultati da mostrare (default 6)
     cols   : colonne della griglia (default 3)
+    model_name : nome del modello HuggingFace (default: DEFAULT_MODEL)
     """
     # ── Ricerca ────────────────────────────────────────
-    model, processor = load_model()
-    index, metadata = load_index()
+    model, processor = load_model(model_name)
+    index_path, meta_path = get_index_paths(model_name)
+    index, metadata = load_index(index_path=index_path, meta_path=meta_path)
     query_vec = encode_text(model, processor, query)
     results = search(index, metadata, query_vec, top_k=top_k)
 
