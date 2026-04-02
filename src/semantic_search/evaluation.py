@@ -3,13 +3,20 @@ import time
 from semantic_search.encoder import encode_text
 from semantic_search.search import search
 
+# EVAL_QUERIES = [
+#     "scavo con tubazioni gas gialle a bassa profondità",
+#     "operai con elmetto in cantiere",
+#     "lavori stradali in area urbana",
+#     "installazione tubature sottoterra",
+#     "vista aerea di un cantiere",
+#     "safety helmets construction workers",
+# ]
 EVAL_QUERIES = [
-    "scavo con tubazioni gas gialle a bassa profondità",
-    "operai con elmetto in cantiere",
-    "lavori stradali in area urbana",
-    "installazione tubature sottoterra",
-    "vista aerea di un cantiere",
-    "safety helmets construction workers",
+    "a yellow school bus parked on the street",
+    "a pizza on a table next to a glass of wine",
+    "a red stop sign with graffiti on it",
+    "a kitchen with stainless steel appliances",
+    "a small teddy bear sitting on a large bed",
 ]
 
 

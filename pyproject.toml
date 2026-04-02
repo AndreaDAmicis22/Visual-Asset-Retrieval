@@ -1,29 +1,29 @@
 [project]
 name = "visual"
 version = "0.1.0"
-description = ""
+description = "Semantic Visual Asset Retrieval"
 authors = [
     {name = "Andrea D'Amicis"}
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "torch (>=2.0.0)",
-    "torchvision (>=0.15.0)",
-    "transformers (>=4.35.0)",
-    "faiss-cpu (>=1.7.4)",
-    "pillow (>=9.0.0)",
-    "tqdm (>=4.65.0)",
-    "requests (>=2.28.0)",
-    "numpy (>=1.24.0)",
-    "matplotlib (>=3.10.8,<4.0.0)"
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "transformers>=4.35.0",
+    "faiss-cpu>=1.7.4",
+    "pillow>=9.0.0",
+    "tqdm>=4.65.0",
+    "requests>=2.28.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.10.8,<4.0.0"
 ]
 
+[tool.poetry]
+packages = [{ include = "semantic_search", from = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = ">=7.2.0,<8.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[dependency-groups]
-dev = [
-    "ipykernel (>=7.2.0,<8.0.0)"
-]

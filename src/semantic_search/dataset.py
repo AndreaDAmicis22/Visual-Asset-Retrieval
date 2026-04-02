@@ -4,13 +4,13 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from semantic_search.config import IMAGE_DIR
+from semantic_search.config import IMAGE_DIR, PROJECT_ROOT
 
 COCO_IMAGES_URL = "http://images.cocodataset.org/zips/val2017.zip"
 COCO_ANNOT_URL = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
-COCO_ZIP = Path("data/val2017.zip")
-ANNOT_ZIP = Path("data/annotations.zip")
-ANNOT_FILE = Path("data/annotations/captions_val2017.json")
+COCO_ZIP = PROJECT_ROOT / "data" / "val2017.zip"
+ANNOT_ZIP = PROJECT_ROOT / "data" / "annotations.zip"
+ANNOT_FILE = PROJECT_ROOT / "data" / "annotations" / "captions_val2017.json"
 
 
 def _download(url: str, dest: Path, label: str):

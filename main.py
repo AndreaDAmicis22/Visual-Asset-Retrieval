@@ -4,15 +4,15 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 import argparse
 
-from semantic_search.config import DEFAULT_MODEL, TOP_K_DEFAULT
-from semantic_search.dataset import download_coco_resources, prepare_coco_dataset
-from semantic_search.demo import download_demo_images
-from semantic_search.encoder import encode_text
-from semantic_search.evaluation import run_evaluation
-from semantic_search.index import load_index, run_indexing
-from semantic_search.model import load_model
-from semantic_search.search import search
-from semantic_search.utils import print_results
+from src.semantic_search.config import DEFAULT_MODEL, TOP_K_DEFAULT
+from src.semantic_search.dataset import download_coco_resources, prepare_coco_dataset
+from src.semantic_search.demo import download_demo_images
+from src.semantic_search.encoder import encode_text
+from src.semantic_search.evaluation import run_evaluation
+from src.semantic_search.index import load_index, run_indexing
+from src.semantic_search.model import load_model
+from src.semantic_search.search import search
+from src.semantic_search.utils import print_results
 
 
 def main():
