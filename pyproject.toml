@@ -5,7 +5,7 @@ description = "Semantic Visual Asset Retrieval"
 authors = [
     {name = "Andrea D'Amicis"}
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14.1 || >3.14.1"
 dependencies = [
     "torch>=2.0.0",
     "torchvision>=0.15.0",
@@ -15,7 +15,10 @@ dependencies = [
     "tqdm>=4.65.0",
     "requests>=2.28.0",
     "numpy>=1.24.0",
-    "matplotlib>=3.10.8,<4.0.0"
+    "matplotlib>=3.10.8,<4.0.0",
+    "networkx (>=3.6.1,<4.0.0)",
+    "groq (>=1.1.2,<2.0.0)",
+    "python-dotenv (>=1.2.2,<2.0.0)"
 ]
 
 [tool.poetry]

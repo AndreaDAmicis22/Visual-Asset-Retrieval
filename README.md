@@ -132,23 +132,6 @@ il vettore di un'immagine è semanticamente significativa senza bisogno di etich
  CLIP non è addestrato per massimizzare la similarità assoluta tra testo e immagine ma è addestrato a distinguere coppie corrette da coppie sbagliate in un batch. Il risultato pratico è che anche una corrispondenza perfetta raramente si supera 0.35–0.40, perché i vettori di testo e immagine restano in zone dello spazio vettoriale relativamente distanti tra loro. I valori vicini a 1 ai ottengono solo confrontando immagine con immagine o testo con testo nello stesso encoder, non cross-modale.
 ---
 
-## Modelli disponibili (tutti CPU-friendly)
-
-| Modello | Dimensione | Accuratezza | Quando usarlo |
-|:---|:---:|:---:|:---|
-| `openai/clip-vit-base-patch32` | ~150 MB | ★★★☆☆ | **Default — inizia qui** |
-| `openai/clip-vit-base-patch16` | ~150 MB | ★★★★☆ | Patch più piccole, più dettaglio |
-| `openai/clip-vit-large-patch14` | ~900 MB | ★★★★★ | Fase 2, dopo validazione |
-| `google/siglip-base-patch16-224` | ~400 MB | ★★★★☆ | Query brevi o in italiano nativo |
-
-Cambia modello con il flag `--model`:
-
-```bash
-poetry run python main.py --query "cantiere" --model openai/clip-vit-large-patch14
-```
-
----
-
 ## Passi successivi
 
 - [ ] Integrare metadati aziendali (data, luogo, ID intervento) nel JSON

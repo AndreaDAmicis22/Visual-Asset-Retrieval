@@ -57,5 +57,5 @@ def run_indexing(
 
     print("[3/3] Costruzione indice FAISS...")
     index = build_index(embeddings)
-    save_index(index, metadata)
+    save_index(index, metadata, index_path, meta_path)
     return index, metadata

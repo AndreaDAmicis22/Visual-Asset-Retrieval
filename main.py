@@ -9,8 +9,10 @@ from semantic_search.dataset import download_coco_resources, prepare_coco_datase
 from semantic_search.demo import download_demo_images
 from semantic_search.encoder import encode_text
 from semantic_search.evaluation import run_evaluation
+from semantic_search.graph import build_graph, load_graph, save_graph
 from semantic_search.index import load_index, run_indexing
 from semantic_search.model import load_model
+from semantic_search.rag import graph_rag_query, print_rag_response
 from semantic_search.search import search
 from semantic_search.utils import print_results
 
@@ -32,6 +34,9 @@ def main():
     parser.add_argument("--coco", action="store_true", help="Scarica COCO val2017 (5.000 immagini) (ZIP e Annotazioni)")
     parser.add_argument("--prepare", action="store_true", help="Prepara il sample di immagini da COCO")
     parser.add_argument("--max-images", type=int, default=5000, help="Numero di immagini per il sample (default: 5000)")
+    parser.add_argument("--build-graph", action="store_true", help="Costruisce il grafo dall'indice esistente")
+    parser.add_argument("--rag", type=str, default=None, help="Query Graph RAG in linguaggio naturale")
+    parser.add_argument("--graph-depth", type=int, default=2, help="Profondità sottografo per RAG (default: 2)")
     args = parser.parse_args()
     index_path, meta_path = get_index_paths(args.model)
 
@@ -72,6 +77,23 @@ def main():
         prepare_coco_dataset(max_images=args.max_images)
         model, processor = load_model(args.model)
         run_indexing(model, processor, index_path=index_path, meta_path=meta_path)
+        return
+
+    if args.build_graph:
+        model, processor = load_model(args.model)
+        index, metadata = load_index(index_path=index_path, meta_path=meta_path)
+        G = build_graph(index, metadata, model_name=args.model)
+        save_graph(G, model_name=args.model)
+        return
+
+    if args.rag:
+        model, processor = load_model(args.model)
+        index, metadata = load_index(index_path=index_path, meta_path=meta_path)
+        G = load_graph(model_name=args.model)
+        response = graph_rag_query(
+            args.rag, G, index, metadata, model, processor, top_k=args.top_k, graph_depth=args.graph_depth
+        )
+        print_rag_response(args.rag, response)
         return
 
     parser.print_help()

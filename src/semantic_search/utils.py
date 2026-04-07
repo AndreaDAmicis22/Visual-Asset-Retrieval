@@ -2,12 +2,15 @@ import math
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import numpy as np
 from PIL import Image
 
 from semantic_search.config import DEFAULT_MODEL, get_index_paths
 from semantic_search.encoder import encode_text
+from semantic_search.graph import load_graph
 from semantic_search.index import load_index
 from semantic_search.model import load_model
+from semantic_search.rag import graph_rag_query
 from semantic_search.search import search
 
 
@@ -120,6 +123,77 @@ def visual_search(query: str, top_k: int = 6, cols: int = 3, model_name: str = D
     plt.tight_layout()
     plt.show()
     print(f'  {len(results)} risultati per: "{query}"')
+
+
+def visual_rag(query: str, top_k: int = 4, cols: int = 2, graph_depth: int = 2, model_name: str = DEFAULT_MODEL):
+    """
+    Esegue una query Graph RAG e mostra sia la risposta testuale dell'LLM
+    che le immagini caricate nel contesto.
+    """
+    model, processor = load_model(model_name)
+    index_path, meta_path = get_index_paths(model_name)
+    index, metadata = load_index(index_path=index_path, meta_path=meta_path)
+
+    G = load_graph()
+
+    query_vec = encode_text(model, processor, query)
+    results = search(index, metadata, query_vec, top_k=top_k)
+
+    if not results:
+        print("Nessun risultato trovato per il contesto.")
+        return
+
+    response = graph_rag_query(query, G, index, metadata, model, processor, top_k=top_k, graph_depth=graph_depth)
+
+    print(f"\n{'═' * 60}")
+    print(f' 🤖 RAG RESPONSE for: "{query}"')
+    print(f"{'═' * 60}")
+    print(f"\n{response}\n")
+    print(f"{'─' * 60}")
+    print("🖼️  Context Images Used:")
+
+    rows = math.ceil(len(results) / cols)
+    fig_w = cols * 4.5
+    fig_h = rows * 4
+
+    fig, axes = plt.subplots(rows, cols, figsize=(fig_w, fig_h))
+    fig.patch.set_facecolor("#0f0f0f")
+
+    axes = np.array(axes).flatten()
+
+    for i, result in enumerate(results):
+        ax = axes[i]
+        ax.set_facecolor("#1a1a1a")
+
+        try:
+            img = Image.open(result["path"]).convert("RGB")
+            ax.imshow(img)
+
+            ax.text(
+                0.02,
+                0.96,
+                f" #{i + 1} | {result['filename']}",
+                transform=ax.transAxes,
+                fontsize=8,
+                fontweight="bold",
+                color="white",
+                va="top",
+                ha="left",
+                bbox={"boxstyle": "round,pad=0.2", "facecolor": "#3b82f6", "alpha": 0.8, "edgecolor": "none"},
+            )
+        except Exception:
+            ax.text(0.5, 0.5, f"Error loading\n{result['filename']}", ha="center", va="center", color="red")
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#444444")
+
+    for j in range(len(results), len(axes)):
+        axes[j].axis("off")
+
+    plt.tight_layout()
+    plt.show()
 
 
 def print_results(results: list[dict], query: str):
