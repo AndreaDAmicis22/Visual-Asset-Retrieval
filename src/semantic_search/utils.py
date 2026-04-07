@@ -1,8 +1,10 @@
 import math
+import os
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from IPython.display import HTML, display
 from PIL import Image
 
 from semantic_search.config import DEFAULT_MODEL, get_index_paths
@@ -194,6 +196,60 @@ def visual_rag(query: str, top_k: int = 4, cols: int = 2, graph_depth: int = 2, 
 
     plt.tight_layout()
     plt.show()
+
+
+def visual_rag_html(query: str, top_k: int = 4, graph_depth: int = 2, model_name: str = DEFAULT_MODEL):
+    """
+    Esegue una query Graph RAG e alterna testo e immagini nel notebook.
+    """
+    # --- Recupero dati (Logica esistente) ---
+    model, processor = load_model(model_name)
+    index_path, meta_path = get_index_paths(model_name)
+    index, metadata = load_index(index_path=index_path, meta_path=meta_path)
+    G = load_graph()
+
+    # Esecuzione query Groq
+    response = graph_rag_query(query, G, index, metadata, model, processor, top_k=top_k, graph_depth=graph_depth)
+
+    # Recupero risultati FAISS per le immagini
+    query_vec = encode_text(model, processor, query)
+    results = search(index, metadata, query_vec, top_k=top_k)
+
+    # --- Visualizzazione ---
+
+    # Titolo e Risposta dell'AI
+    display(
+        HTML(f"""
+        <div style="background-color: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px;">
+            <h2 style="color: #3b82f6; margin-top: 0;">🔍 Query: {query}</h2>
+            <div style="color: #e0e0e0; font-size: 1.1em; line-height: 1.6;">{response.replace("\n", "<br>")}</div>
+        </div>
+    """)
+    )
+
+    display(HTML("<h3 style='color: white; margin-left: 10px;'>📸 Immagini di contesto utilizzate:</h3>"))
+
+    # Ciclo sulle immagini
+    for i, res in enumerate(results):
+        # IMPORTANTE: Se sei su Windows, i path devono avere gli slash giusti per l'HTML
+        img_path = os.path.abspath(res["path"]).replace("\\", "/")
+
+        # Se stai usando Jupyter locale, a volte serve il prefisso file:///
+        img_url = f"file:///{img_path}"
+
+        html_item = f"""
+        <div style="display: flex; align-items: flex-start; background-color: #252525; padding: 15px; border-radius: 8px; margin: 10px; border: 1px solid #444;">
+            <div style="flex: 0 0 250px;">
+                <img src="{img_url}" style="width: 100%; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
+            </div>
+            <div style="flex: 1; margin-left: 20px; color: #ccc;">
+                <b style="color: #3b82f6; font-size: 1.1em;">#{i + 1} - {res["filename"]}</b><br>
+                <p style="margin-top: 5px;"><b>FAISS Score:</b> {res["score"]:.4f}</p>
+                <p style="font-size: 0.9em; font-style: italic; color: #888;">Path: {res["path"]}</p>
+            </div>
+        </div>
+        """
+        display(HTML(html_item))
 
 
 def print_results(results: list[dict], query: str):
