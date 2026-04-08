@@ -1,8 +1,8 @@
 import warnings
 
 warnings.filterwarnings("ignore", category=FutureWarning)
-
 import argparse
+import time
 
 from semantic_search.config import DEFAULT_MODEL, TOP_K_DEFAULT, get_index_paths
 from semantic_search.dataset import download_coco_resources, prepare_coco_dataset
@@ -10,6 +10,7 @@ from semantic_search.demo import download_demo_images
 from semantic_search.encoder import encode_text
 from semantic_search.evaluation import run_evaluation
 from semantic_search.graph import build_graph, load_graph, save_graph
+from semantic_search.graph_viz import viz_clusters, viz_subgraph
 from semantic_search.index import load_index, run_indexing
 from semantic_search.model import load_model
 from semantic_search.rag import graph_rag_query, print_rag_response
@@ -37,6 +38,10 @@ def main():
     parser.add_argument("--build-graph", action="store_true", help="Costruisce il grafo dall'indice esistente")
     parser.add_argument("--rag", type=str, default=None, help="Query Graph RAG in linguaggio naturale")
     parser.add_argument("--graph-depth", type=int, default=2, help="Profondità sottografo per RAG (default: 2)")
+    parser.add_argument(
+        "--viz-subgraph", type=str, default=None, help="Visualizza sottografo attorno a un filename (es: 000000001.jpg)"
+    )
+    parser.add_argument("--viz-clusters", action="store_true", help="Visualizza cluster di immagini simili")
     args = parser.parse_args()
     index_path, meta_path = get_index_paths(args.model)
 
@@ -94,6 +99,28 @@ def main():
             args.rag, G, index, metadata, model, processor, top_k=args.top_k, graph_depth=args.graph_depth
         )
         print_rag_response(args.rag, response)
+        return
+
+    if args.viz_subgraph:
+        G = load_graph(model_name=args.model)
+        viz_subgraph(G, args.viz_subgraph, depth=args.graph_depth, model_name=args.model)
+        print("  Server attivo — premi Ctrl+C per uscire")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n  Server fermato.")
+        return
+
+    if args.viz_clusters:
+        G = load_graph(model_name=args.model)
+        viz_clusters(G, model_name=args.model)
+        print("  Server attivo — premi Ctrl+C per uscire")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n  Server fermato.")
         return
 
     parser.print_help()
