@@ -98,8 +98,6 @@ def _extract_entities(captions: list[str]) -> set[str]:
 # ─────────────────────────────────────────────
 # Build
 # ─────────────────────────────────────────────
-
-
 def build_graph(
     index,
     metadata: list[dict],
@@ -198,8 +196,6 @@ def build_graph(
 # ─────────────────────────────────────────────
 # Save / Load
 # ─────────────────────────────────────────────
-
-
 def get_graph_path(model_name: str = DEFAULT_MODEL) -> Path:
     index_path, _ = get_index_paths(model_name)
     return index_path.parent / "graph.json"
