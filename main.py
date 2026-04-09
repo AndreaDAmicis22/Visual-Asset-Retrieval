@@ -25,13 +25,9 @@ def main():
         "--index", action="store_true", help="Ri-indicizza le immagini nella cartella 'images/'"
     )  # poetry run python main.py --index
     parser.add_argument("--query", type=str, default=None, help='Query testuale (es: "scavo con tubi gialli")')
-    parser.add_argument(
-        "--top-k", type=int, default=TOP_K_DEFAULT, help=f"Numero di risultati (default: {TOP_K_DEFAULT})"
-    )
+    parser.add_argument("--top-k", type=int, default=TOP_K_DEFAULT, help=f"Numero di risultati (default: {TOP_K_DEFAULT})")
     parser.add_argument("--eval", action="store_true", help="Esegui la batteria di valutazione dell'encoder")
-    parser.add_argument(
-        "--model", type=str, default=DEFAULT_MODEL, help=f"Modello HuggingFace (default: {DEFAULT_MODEL})"
-    )
+    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help=f"Modello HuggingFace (default: {DEFAULT_MODEL})")
     parser.add_argument("--coco", action="store_true", help="Scarica COCO val2017 (5.000 immagini) (ZIP e Annotazioni)")
     parser.add_argument("--prepare", action="store_true", help="Prepara il sample di immagini da COCO")
     parser.add_argument("--max-images", type=int, default=5000, help="Numero di immagini per il sample (default: 5000)")
